@@ -1,6 +1,10 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MapExplorer from './MapExplorer';
-import { fetchSpotsInBounds, fetchSpotsInRadius } from '@/lib/api';
+import {
+  fetchSpotsInBounds,
+  fetchSpotsInRadius,
+  reverseGeocode,
+} from '@/lib/api';
 import type { Spot, Bounds, LatLng } from '@/lib/types';
 
 // Stub the map: expose a button that simulates the map settling (camera change).
@@ -27,6 +31,7 @@ jest.mock('@/lib/api', () => ({
   __esModule: true,
   fetchSpotsInBounds: jest.fn(),
   fetchSpotsInRadius: jest.fn(),
+  reverseGeocode: jest.fn(),
 }));
 
 const viewportSpots: Spot[] = [
@@ -42,6 +47,20 @@ describe('MapExplorer', () => {
     jest.clearAllMocks();
     (fetchSpotsInBounds as jest.Mock).mockResolvedValue(viewportSpots);
     (fetchSpotsInRadius as jest.Mock).mockResolvedValue(radiusSpots);
+    (reverseGeocode as jest.Mock).mockResolvedValue({
+      address: '東京都千代田区',
+      cached: false,
+    });
+  });
+
+  it('shows the reverse-geocoded centre address after the map settles', async () => {
+    render(<MapExplorer />);
+    fireEvent.click(screen.getByText('trigger-camera'));
+
+    await waitFor(() =>
+      expect(reverseGeocode).toHaveBeenCalledWith({ lat: 35.5, lng: 139.5 }),
+    );
+    expect(await screen.findByText('東京都千代田区')).toBeInTheDocument();
   });
 
   it('fetches spots for the viewport bounds when the map settles', async () => {
