@@ -1,19 +1,31 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MapExplorer from './MapExplorer';
-import { fetchAllSpots } from '@/lib/api';
-import type { Spot } from '@/lib/types';
+import { fetchSpotsInBounds } from '@/lib/api';
+import type { Spot, Bounds, LatLng } from '@/lib/types';
 
-// Stub the map component so tests don't load the Google Maps SDK.
+// Stub the map: expose a button that simulates the map settling (camera change).
 jest.mock('./MapView', () => ({
   __esModule: true,
-  default: ({ spots }: { spots: Spot[] }) => (
-    <div data-testid="map-view">markers: {spots.length}</div>
+  default: (props: {
+    onCameraChange?: (c: LatLng, b: Bounds | null) => void;
+  }) => (
+    <button
+      type="button"
+      onClick={() =>
+        props.onCameraChange?.(
+          { lat: 35.5, lng: 139.5 },
+          { minLat: 35, minLng: 139, maxLat: 36, maxLng: 140 },
+        )
+      }
+    >
+      trigger-camera
+    </button>
   ),
 }));
 
 jest.mock('@/lib/api', () => ({
   __esModule: true,
-  fetchAllSpots: jest.fn(),
+  fetchSpotsInBounds: jest.fn(),
 }));
 
 const sampleSpots: Spot[] = [
@@ -21,16 +33,26 @@ const sampleSpots: Spot[] = [
   { id: 2, name: 'B', category: 'y', address: null, lat: 35.7, lng: 139.8 },
 ];
 
-describe('MapExplorer', () => {
-  it('fetches all spots on mount and passes them to the map', async () => {
-    (fetchAllSpots as jest.Mock).mockResolvedValue(sampleSpots);
+describe('MapExplorer viewport fetching', () => {
+  beforeEach(() => jest.clearAllMocks());
+
+  it('fetches spots for the viewport bounds when the map settles', async () => {
+    (fetchSpotsInBounds as jest.Mock).mockResolvedValue(sampleSpots);
 
     render(<MapExplorer />);
+    // starts empty
+    expect(screen.getByText('0件のスポット')).toBeInTheDocument();
 
-    // MapView renders (API key is provided by jest.env.js)
-    expect(screen.getByTestId('map-view')).toBeInTheDocument();
+    fireEvent.click(screen.getByText('trigger-camera'));
+
     await waitFor(() =>
-      expect(screen.getByTestId('map-view')).toHaveTextContent('markers: 2'),
+      expect(fetchSpotsInBounds).toHaveBeenCalledWith({
+        minLat: 35,
+        minLng: 139,
+        maxLat: 36,
+        maxLng: 140,
+      }),
     );
+    expect(await screen.findByText('2件のスポット')).toBeInTheDocument();
   });
 });
