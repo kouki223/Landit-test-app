@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useRef } from 'react';
+import Spinner from './Spinner';
 import type { Spot } from '@/lib/types';
 
 interface SpotListProps {
@@ -8,6 +9,7 @@ interface SpotListProps {
   selectedId: number | null;
   onSelect: (id: number | null) => void;
   title?: string;
+  loading?: boolean;
 }
 
 function formatDistance(distanceM?: number): string | null {
@@ -22,6 +24,7 @@ export default function SpotList({
   selectedId,
   onSelect,
   title = '表示範囲のスポット',
+  loading = false,
 }: SpotListProps) {
   const selectedRef = useRef<HTMLLIElement | null>(null);
 
@@ -33,13 +36,16 @@ export default function SpotList({
   return (
     <div className="flex h-full flex-col">
       <div className="border-b px-4 py-3">
-        <h2 className="text-sm font-semibold text-gray-800">{title}</h2>
+        <h2 className="flex items-center gap-2 text-sm font-semibold text-gray-800">
+          {title}
+          {loading && <Spinner className="text-blue-600" />}
+        </h2>
         <p className="text-xs text-gray-500">{spots.length}件のスポット</p>
       </div>
 
       {spots.length === 0 ? (
         <div className="flex flex-1 items-center justify-center p-6 text-center text-sm text-gray-400">
-          この範囲にスポットはありません
+          {loading ? '読み込み中…' : 'この範囲にスポットはありません'}
         </div>
       ) : (
         <ul className="flex-1 divide-y overflow-y-auto">

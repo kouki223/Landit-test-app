@@ -46,6 +46,12 @@ describe('RadiusControl', () => {
     expect(screen.getByRole('button', { name: 'この範囲で検索' })).toBeDisabled();
   });
 
+  it('shows a searching state and disables the button while searching', () => {
+    setup({ searching: true });
+    const button = screen.getByRole('button', { name: /検索中…/ });
+    expect(button).toBeDisabled();
+  });
+
   it('hides clear until active, then calls onClear', () => {
     const { onClear, ...rest } = setup({ active: false });
     expect(screen.queryByRole('button', { name: 'クリア' })).toBeNull();
