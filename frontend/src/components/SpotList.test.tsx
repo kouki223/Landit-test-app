@@ -41,4 +41,10 @@ describe('SpotList', () => {
     fireEvent.click(screen.getByText('六本木ヒルズ'));
     expect(onSelect).toHaveBeenCalledWith(null);
   });
+
+  it('shows a loading message instead of the empty state while loading', () => {
+    render(<SpotList spots={[]} selectedId={null} onSelect={() => {}} loading />);
+    expect(screen.getByText('読み込み中…')).toBeInTheDocument();
+    expect(screen.queryByText('この範囲にスポットはありません')).toBeNull();
+  });
 });
