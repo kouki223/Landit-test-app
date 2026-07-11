@@ -36,6 +36,7 @@ export default function MapExplorer() {
   const [bounds, setBounds] = useState<Bounds | null>(null);
   const [radiusKm, setRadiusKm] = useState(5);
   const [radiusResult, setRadiusResult] = useState<RadiusResult | null>(null);
+  const [radiusMode, setRadiusMode] = useState(false);
   const [address, setAddress] = useState<string | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
   const [spotsLoading, setSpotsLoading] = useState(false);
@@ -118,6 +119,19 @@ export default function MapExplorer() {
     if (bounds) fetchAndCache(bounds);
   }, [bounds, fetchAndCache]);
 
+  const handleToggleRadius = useCallback(
+    (on: boolean) => {
+      setRadiusMode(on);
+      // Turning off clears any active result and returns to the viewport list.
+      if (!on) {
+        setRadiusResult(null);
+        setSelectedId(null);
+        if (bounds) fetchAndCache(bounds);
+      }
+    },
+    [bounds, fetchAndCache],
+  );
+
   if (!API_KEY) {
     return (
       <main className="flex h-full w-full items-center justify-center p-8 text-center">
@@ -132,8 +146,11 @@ export default function MapExplorer() {
     );
   }
 
-  // Frozen circle while a radius result is shown; otherwise a live preview at centre.
-  const circle = radiusResult ?? (center ? { center, radiusKm } : null);
+  // Only draw a circle when radius search is enabled: frozen at the searched
+  // centre while a result is shown, otherwise a live preview at the map centre.
+  const circle = radiusMode
+    ? (radiusResult ?? (center ? { center, radiusKm } : null))
+    : null;
 
   return (
     <main className="flex h-full w-full flex-col">
@@ -154,6 +171,8 @@ export default function MapExplorer() {
         </aside>
         <div className="relative flex-1">
           <RadiusControl
+            enabled={radiusMode}
+            onToggle={handleToggleRadius}
             radiusKm={radiusKm}
             onRadiusChange={setRadiusKm}
             onSearch={handleSearch}
