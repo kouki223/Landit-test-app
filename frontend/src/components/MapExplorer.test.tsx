@@ -7,23 +7,36 @@ import {
 } from '@/lib/api';
 import type { Spot, Bounds, LatLng } from '@/lib/types';
 
-// Stub the map: expose a button that simulates the map settling (camera change).
+// Stub the map: expose buttons that simulate the map settling at different viewports.
 jest.mock('./MapView', () => ({
   __esModule: true,
   default: (props: {
     onCameraChange?: (c: LatLng, b: Bounds | null) => void;
   }) => (
-    <button
-      type="button"
-      onClick={() =>
-        props.onCameraChange?.(
-          { lat: 35.5, lng: 139.5 },
-          { minLat: 35, minLng: 139, maxLat: 36, maxLng: 140 },
-        )
-      }
-    >
-      trigger-camera
-    </button>
+    <>
+      <button
+        type="button"
+        onClick={() =>
+          props.onCameraChange?.(
+            { lat: 35.5, lng: 139.5 },
+            { minLat: 35, minLng: 139, maxLat: 36, maxLng: 140 },
+          )
+        }
+      >
+        trigger-camera
+      </button>
+      <button
+        type="button"
+        onClick={() =>
+          props.onCameraChange?.(
+            { lat: 35.55, lng: 139.65 },
+            { minLat: 35.5, minLng: 139.6, maxLat: 35.65, maxLng: 139.75 },
+          )
+        }
+      >
+        zoom-in
+      </button>
+    </>
   ),
 }));
 
@@ -93,5 +106,19 @@ describe('MapExplorer', () => {
     );
     expect(await screen.findByText('半径5km以内のスポット')).toBeInTheDocument();
     expect(screen.getByText('1件のスポット')).toBeInTheDocument();
+  });
+
+  it('serves a zoom-in from cache without a second API call', async () => {
+    render(<MapExplorer />);
+
+    // Wide viewport: fetches and caches (2 spots).
+    fireEvent.click(screen.getByText('trigger-camera'));
+    expect(await screen.findByText('2件のスポット')).toBeInTheDocument();
+    expect(fetchSpotsInBounds).toHaveBeenCalledTimes(1);
+
+    // Zoom into a contained sub-viewport: filtered locally, no new fetch.
+    fireEvent.click(screen.getByText('zoom-in'));
+    expect(await screen.findByText('1件のスポット')).toBeInTheDocument();
+    expect(fetchSpotsInBounds).toHaveBeenCalledTimes(1);
   });
 });
