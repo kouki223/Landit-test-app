@@ -99,6 +99,8 @@ describe('MapExplorer', () => {
     fireEvent.click(screen.getByText('trigger-camera'));
     await screen.findByText('2件のスポット');
 
+    // enable radius mode, then search
+    fireEvent.click(screen.getByRole('switch'));
     fireEvent.click(screen.getByRole('button', { name: 'この範囲で検索' }));
 
     await waitFor(() =>
@@ -106,6 +108,11 @@ describe('MapExplorer', () => {
     );
     expect(await screen.findByText('半径5km以内のスポット')).toBeInTheDocument();
     expect(screen.getByText('1件のスポット')).toBeInTheDocument();
+
+    // Toggling radius OFF clears the result and returns to the viewport list.
+    fireEvent.click(screen.getByRole('switch'));
+    expect(await screen.findByText('表示範囲のスポット')).toBeInTheDocument();
+    expect(screen.getByText('2件のスポット')).toBeInTheDocument();
   });
 
   it('serves a zoom-in from cache without a second API call', async () => {
