@@ -1,18 +1,28 @@
 'use client';
 
-import { APIProvider, Map, Marker, useMap } from '@vis.gl/react-google-maps';
+import {
+  APIProvider,
+  InfoWindow,
+  Map,
+  Marker,
+  useMap,
+} from '@vis.gl/react-google-maps';
 import { useEffect, useRef } from 'react';
 import type { Spot, LatLng, Bounds } from '@/lib/types';
 
-// Rough geographic centre of Japan, used before the fit-to-spots runs.
+// Rough geographic centre of Japan, used before the initial fit runs.
 const JAPAN_CENTER: LatLng = { lat: 37.5, lng: 137.0 };
 const JAPAN_ZOOM = 5;
 
 interface MapViewProps {
   apiKey: string;
   spots: Spot[];
-  /** Fit the viewport to all spots once, on first load (nationwide view). */
-  fitToSpots?: boolean;
+  selectedId: number | null;
+  onSelect: (id: number | null) => void;
+  /** Fit the viewport to these bounds once, on first load. */
+  initialBounds?: Bounds;
+  /** Radius circle to draw (centre + radius in km), or null. */
+  circle?: { center: LatLng; radiusKm: number } | null;
   /** Called (on map idle) with the current centre and viewport bounds. */
   onCameraChange?: (center: LatLng, bounds: Bounds | null) => void;
 }
@@ -20,32 +30,43 @@ interface MapViewProps {
 /** Runs inside the Map context so it can access the google.maps.Map instance. */
 function MapInner({
   spots,
-  fitToSpots,
+  selectedId,
+  onSelect,
+  initialBounds,
+  circle,
   onCameraChange,
 }: Omit<MapViewProps, 'apiKey'>) {
   const map = useMap();
   const didFit = useRef(false);
+  const circleRef = useRef<google.maps.Circle | null>(null);
 
-  // Clicking the map recenters it on the clicked point (centre marker follows).
+  // Clicking empty map area recenters and clears any selection.
   useEffect(() => {
     if (!map) return;
     const listener = map.addListener(
       'click',
       (e: google.maps.MapMouseEvent) => {
         if (e.latLng) map.panTo(e.latLng);
+        onSelect(null);
       },
     );
     return () => listener.remove();
-  }, [map]);
+  }, [map, onSelect]);
 
-  // Fit to all spots once on initial load.
+  // Fit to the initial (nationwide) bounds once.
   useEffect(() => {
-    if (!map || !fitToSpots || didFit.current || spots.length === 0) return;
-    const bounds = new google.maps.LatLngBounds();
-    spots.forEach((s) => bounds.extend({ lat: s.lat, lng: s.lng }));
-    map.fitBounds(bounds, 48);
+    if (!map || !initialBounds || didFit.current) return;
+    map.fitBounds(
+      {
+        south: initialBounds.minLat,
+        west: initialBounds.minLng,
+        north: initialBounds.maxLat,
+        east: initialBounds.maxLng,
+      },
+      0,
+    );
     didFit.current = true;
-  }, [map, spots, fitToSpots]);
+  }, [map, initialBounds]);
 
   // Emit centre + bounds whenever the camera settles.
   useEffect(() => {
@@ -71,11 +92,81 @@ function MapInner({
     return () => listener.remove();
   }, [map, onCameraChange]);
 
+  // Pan to a spot when it becomes selected (e.g. clicked in the list).
+  useEffect(() => {
+    if (!map || selectedId == null) return;
+    const s = spots.find((x) => x.id === selectedId);
+    if (s) map.panTo({ lat: s.lat, lng: s.lng });
+  }, [map, selectedId, spots]);
+
+  // Draw/update the radius circle imperatively.
+  useEffect(() => {
+    if (!map) return;
+    if (!circle) {
+      circleRef.current?.setMap(null);
+      circleRef.current = null;
+      return;
+    }
+    if (!circleRef.current) {
+      circleRef.current = new google.maps.Circle({
+        strokeColor: '#2563eb',
+        strokeOpacity: 0.8,
+        strokeWeight: 2,
+        fillColor: '#2563eb',
+        fillOpacity: 0.08,
+        clickable: false,
+        map,
+      });
+    }
+    circleRef.current.setCenter(circle.center);
+    circleRef.current.setRadius(circle.radiusKm * 1000);
+    return () => {
+      // cleanup on unmount handled by the null branch above
+    };
+  }, [map, circle]);
+
+  const selectedSpot = spots.find((s) => s.id === selectedId) ?? null;
+  const selectedIcon: google.maps.Symbol | undefined =
+    typeof google !== 'undefined'
+      ? {
+          path: google.maps.SymbolPath.CIRCLE,
+          scale: 8,
+          fillColor: '#2563eb',
+          fillOpacity: 1,
+          strokeColor: '#ffffff',
+          strokeWeight: 2,
+        }
+      : undefined;
+
   return (
     <>
       {spots.map((s) => (
-        <Marker key={s.id} position={{ lat: s.lat, lng: s.lng }} title={s.name} />
+        <Marker
+          key={s.id}
+          position={{ lat: s.lat, lng: s.lng }}
+          title={s.name}
+          icon={s.id === selectedId ? selectedIcon : undefined}
+          zIndex={s.id === selectedId ? 1000 : undefined}
+          onClick={() => onSelect(s.id)}
+        />
       ))}
+
+      {selectedSpot && (
+        <InfoWindow
+          position={{ lat: selectedSpot.lat, lng: selectedSpot.lng }}
+          onCloseClick={() => onSelect(null)}
+        >
+          <div className="min-w-[160px] text-gray-800">
+            <p className="text-sm font-bold">{selectedSpot.name}</p>
+            <p className="mt-0.5 text-xs text-gray-500">
+              {selectedSpot.category}
+            </p>
+            {selectedSpot.address && (
+              <p className="mt-1 text-xs">{selectedSpot.address}</p>
+            )}
+          </div>
+        </InfoWindow>
+      )}
     </>
   );
 }
@@ -84,7 +175,6 @@ function MapInner({
 function CenterMarker() {
   return (
     <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">
-      {/* pin whose tip sits exactly on the centre */}
       <svg
         width="34"
         height="34"
@@ -107,7 +197,10 @@ function CenterMarker() {
 export default function MapView({
   apiKey,
   spots,
-  fitToSpots,
+  selectedId,
+  onSelect,
+  initialBounds,
+  circle,
   onCameraChange,
 }: MapViewProps) {
   return (
@@ -122,7 +215,10 @@ export default function MapView({
         >
           <MapInner
             spots={spots}
-            fitToSpots={fitToSpots}
+            selectedId={selectedId}
+            onSelect={onSelect}
+            initialBounds={initialBounds}
+            circle={circle}
             onCameraChange={onCameraChange}
           />
         </Map>
