@@ -12,6 +12,11 @@ import {
 } from '@/lib/api';
 import { debounce } from '@/lib/geo';
 import { createAddressResolver } from '@/lib/address';
+import {
+  isContained,
+  filterSpots,
+  type CachedRegion,
+} from '@/lib/viewportCache';
 import type { Spot, LatLng, Bounds } from '@/lib/types';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
@@ -40,12 +45,32 @@ export default function MapExplorer() {
     radiusActiveRef.current = radiusResult !== null;
   }, [radiusResult]);
 
-  const loadBounds = useRef(
-    debounce((b: Bounds) => {
-      fetchSpotsInBounds(b)
-        .then(setSpots)
-        .catch((err) => console.error('Failed to load spots in bounds', err));
-    }, 400),
+  // Last fully-fetched region. A new viewport contained within it can be served
+  // by filtering locally instead of calling the API again.
+  const cacheRef = useRef<CachedRegion | null>(null);
+
+  const fetchAndCache = useCallback((b: Bounds) => {
+    fetchSpotsInBounds(b)
+      .then((res) => {
+        cacheRef.current = { bounds: b, spots: res };
+        setSpots(res);
+      })
+      .catch((err) => console.error('Failed to load spots in bounds', err));
+  }, []);
+
+  const loadBounds = useRef(debounce(fetchAndCache, 400));
+
+  // Serve from the cached region when zooming into it; otherwise fetch (debounced).
+  const applyViewport = useCallback(
+    (b: Bounds) => {
+      const cache = cacheRef.current;
+      if (cache && isContained(b, cache.bounds)) {
+        setSpots(filterSpots(cache.spots, b));
+      } else {
+        loadBounds.current(b);
+      }
+    },
+    [],
   );
 
   // Reverse-geocode resolver with distance-threshold + grid cache (fewer API calls).
@@ -59,7 +84,7 @@ export default function MapExplorer() {
     setCenter(c);
     setBounds(b);
     // In radius mode the list is frozen to the search result; skip viewport fetch.
-    if (!radiusActiveRef.current && b) loadBounds.current(b);
+    if (!radiusActiveRef.current && b) applyViewport(b);
 
     // Update the centre address (skipped internally for tiny moves / cache hits).
     setAddressLoading(true);
@@ -70,7 +95,7 @@ export default function MapExplorer() {
       })
       .catch((err) => console.error('Reverse geocode failed', err))
       .finally(() => setAddressLoading(false));
-  }, []);
+  }, [applyViewport]);
 
   const handleSearch = useCallback(() => {
     if (!center) return;
@@ -84,12 +109,8 @@ export default function MapExplorer() {
   const handleClear = useCallback(() => {
     setRadiusResult(null);
     setSelectedId(null);
-    if (bounds) {
-      fetchSpotsInBounds(bounds)
-        .then(setSpots)
-        .catch((err) => console.error('Failed to reload viewport', err));
-    }
-  }, [bounds]);
+    if (bounds) fetchAndCache(bounds);
+  }, [bounds, fetchAndCache]);
 
   if (!API_KEY) {
     return (
