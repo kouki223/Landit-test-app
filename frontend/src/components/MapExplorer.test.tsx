@@ -1,6 +1,6 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
 import MapExplorer from './MapExplorer';
-import { fetchSpotsInBounds } from '@/lib/api';
+import { fetchSpotsInBounds, fetchSpotsInRadius } from '@/lib/api';
 import type { Spot, Bounds, LatLng } from '@/lib/types';
 
 // Stub the map: expose a button that simulates the map settling (camera change).
@@ -26,21 +26,26 @@ jest.mock('./MapView', () => ({
 jest.mock('@/lib/api', () => ({
   __esModule: true,
   fetchSpotsInBounds: jest.fn(),
+  fetchSpotsInRadius: jest.fn(),
 }));
 
-const sampleSpots: Spot[] = [
+const viewportSpots: Spot[] = [
   { id: 1, name: 'A', category: 'x', address: null, lat: 35.6, lng: 139.7 },
   { id: 2, name: 'B', category: 'y', address: null, lat: 35.7, lng: 139.8 },
 ];
+const radiusSpots: Spot[] = [
+  { id: 1, name: 'A', category: 'x', address: null, lat: 35.6, lng: 139.7, distanceM: 800 },
+];
 
-describe('MapExplorer viewport fetching', () => {
-  beforeEach(() => jest.clearAllMocks());
+describe('MapExplorer', () => {
+  beforeEach(() => {
+    jest.clearAllMocks();
+    (fetchSpotsInBounds as jest.Mock).mockResolvedValue(viewportSpots);
+    (fetchSpotsInRadius as jest.Mock).mockResolvedValue(radiusSpots);
+  });
 
   it('fetches spots for the viewport bounds when the map settles', async () => {
-    (fetchSpotsInBounds as jest.Mock).mockResolvedValue(sampleSpots);
-
     render(<MapExplorer />);
-    // starts empty
     expect(screen.getByText('0件のスポット')).toBeInTheDocument();
 
     fireEvent.click(screen.getByText('trigger-camera'));
@@ -54,5 +59,20 @@ describe('MapExplorer viewport fetching', () => {
       }),
     );
     expect(await screen.findByText('2件のスポット')).toBeInTheDocument();
+  });
+
+  it('runs a radius search from the current centre on button click', async () => {
+    render(<MapExplorer />);
+    // establish a centre first
+    fireEvent.click(screen.getByText('trigger-camera'));
+    await screen.findByText('2件のスポット');
+
+    fireEvent.click(screen.getByRole('button', { name: 'この範囲で検索' }));
+
+    await waitFor(() =>
+      expect(fetchSpotsInRadius).toHaveBeenCalledWith({ lat: 35.5, lng: 139.5 }, 5),
+    );
+    expect(await screen.findByText('半径5km以内のスポット')).toBeInTheDocument();
+    expect(screen.getByText('1件のスポット')).toBeInTheDocument();
   });
 });
