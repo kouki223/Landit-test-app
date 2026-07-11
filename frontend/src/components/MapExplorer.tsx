@@ -38,6 +38,8 @@ export default function MapExplorer() {
   const [radiusResult, setRadiusResult] = useState<RadiusResult | null>(null);
   const [address, setAddress] = useState<string | null>(null);
   const [addressLoading, setAddressLoading] = useState(false);
+  const [spotsLoading, setSpotsLoading] = useState(false);
+  const [searching, setSearching] = useState(false);
 
   // Mirror radiusResult in a ref so the debounced camera handler can read it.
   const radiusActiveRef = useRef(false);
@@ -50,12 +52,14 @@ export default function MapExplorer() {
   const cacheRef = useRef<CachedRegion | null>(null);
 
   const fetchAndCache = useCallback((b: Bounds) => {
+    setSpotsLoading(true);
     fetchSpotsInBounds(b)
       .then((res) => {
         cacheRef.current = { bounds: b, spots: res };
         setSpots(res);
       })
-      .catch((err) => console.error('Failed to load spots in bounds', err));
+      .catch((err) => console.error('Failed to load spots in bounds', err))
+      .finally(() => setSpotsLoading(false));
   }, []);
 
   const loadBounds = useRef(debounce(fetchAndCache, 400));
@@ -101,9 +105,11 @@ export default function MapExplorer() {
     if (!center) return;
     setRadiusResult({ center, radiusKm });
     setSelectedId(null);
+    setSearching(true);
     fetchSpotsInRadius(center, radiusKm)
       .then(setSpots)
-      .catch((err) => console.error('Radius search failed', err));
+      .catch((err) => console.error('Radius search failed', err))
+      .finally(() => setSearching(false));
   }, [center, radiusKm]);
 
   const handleClear = useCallback(() => {
@@ -138,6 +144,7 @@ export default function MapExplorer() {
             spots={spots}
             selectedId={selectedId}
             onSelect={setSelectedId}
+            loading={spotsLoading || searching}
             title={
               radiusResult
                 ? `半径${radiusResult.radiusKm}km以内のスポット`
@@ -153,6 +160,7 @@ export default function MapExplorer() {
             onClear={handleClear}
             active={radiusResult !== null}
             disabled={center === null}
+            searching={searching}
           />
           <MapView
             apiKey={API_KEY}

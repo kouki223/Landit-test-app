@@ -1,5 +1,7 @@
 'use client';
 
+import Spinner from './Spinner';
+
 const PRESETS = [1, 3, 5, 10];
 
 interface RadiusControlProps {
@@ -11,6 +13,8 @@ interface RadiusControlProps {
   active: boolean;
   /** Disable actions until the map centre is known. */
   disabled?: boolean;
+  /** True while a radius search request is in flight. */
+  searching?: boolean;
 }
 
 export default function RadiusControl({
@@ -20,6 +24,7 @@ export default function RadiusControl({
   onClear,
   active,
   disabled = false,
+  searching = false,
 }: RadiusControlProps) {
   return (
     <div className="absolute left-1/2 top-3 z-20 w-[min(92%,420px)] -translate-x-1/2 rounded-lg bg-white/95 p-3 shadow-lg backdrop-blur">
@@ -70,10 +75,11 @@ export default function RadiusControl({
           <button
             type="button"
             onClick={onSearch}
-            disabled={disabled}
-            className="rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
+            disabled={disabled || searching}
+            className="flex items-center gap-1.5 rounded bg-blue-600 px-3 py-1 text-xs font-medium text-white hover:bg-blue-700 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            この範囲で検索
+            {searching && <Spinner />}
+            {searching ? '検索中…' : 'この範囲で検索'}
           </button>
         </div>
       </div>
