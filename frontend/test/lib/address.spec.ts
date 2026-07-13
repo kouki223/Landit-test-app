@@ -1,4 +1,4 @@
-import { createAddressResolver } from './address';
+import { createAddressResolver } from '@/lib/address';
 
 describe('createAddressResolver', () => {
   it('fetches on the first call', async () => {

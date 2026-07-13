@@ -1,4 +1,4 @@
-import { debounce, distanceMeters } from './geo';
+import { debounce, distanceMeters } from '@/lib/geo';
 
 describe('debounce', () => {
   jest.useFakeTimers();

@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import RadiusControl from './RadiusControl';
+import RadiusControl from '@/components/RadiusControl';
 
 function setup(overrides = {}) {
   const props = {

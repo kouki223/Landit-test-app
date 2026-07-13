@@ -1,4 +1,4 @@
-import { GeocodeService, quantizeKey } from './geocode.service';
+import { GeocodeService, quantizeKey } from '../../src/geocode/geocode.service';
 
 describe('quantizeKey', () => {
   it('rounds coordinates to 3 decimals', () => {

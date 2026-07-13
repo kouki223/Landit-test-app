@@ -1,5 +1,5 @@
 import { render, screen, fireEvent } from '@testing-library/react';
-import SpotList from './SpotList';
+import SpotList from '@/components/SpotList';
 import type { Spot } from '@/lib/types';
 
 const spots: Spot[] = [

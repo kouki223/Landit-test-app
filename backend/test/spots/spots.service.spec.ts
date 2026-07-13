@@ -1,4 +1,4 @@
-import { SpotsService, resolveSearchMode } from './spots.service';
+import { SpotsService, resolveSearchMode } from '../../src/spots/spots.service';
 
 describe('resolveSearchMode', () => {
   it('returns "radius" when lat, lng and radius are present', () => {

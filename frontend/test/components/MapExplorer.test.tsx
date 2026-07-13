@@ -1,5 +1,5 @@
 import { render, screen, fireEvent, waitFor } from '@testing-library/react';
-import MapExplorer from './MapExplorer';
+import MapExplorer from '@/components/MapExplorer';
 import {
   fetchSpotsInBounds,
   fetchSpotsInRadius,
@@ -8,7 +8,7 @@ import {
 import type { Spot, Bounds, LatLng } from '@/lib/types';
 
 // Stub the map: expose buttons that simulate the map settling at different viewports.
-jest.mock('./MapView', () => ({
+jest.mock('@/components/MapView', () => ({
   __esModule: true,
   default: (props: {
     onCameraChange?: (c: LatLng, b: Bounds | null) => void;

@@ -1,5 +1,5 @@
-import { isContained, spotInBounds, filterSpots } from './viewportCache';
-import type { Spot, Bounds } from './types';
+import { isContained, spotInBounds, filterSpots } from '@/lib/viewportCache';
+import type { Spot, Bounds } from '@/lib/types';
 
 const outer: Bounds = { minLat: 35, minLng: 139, maxLat: 36, maxLng: 140 };
 
