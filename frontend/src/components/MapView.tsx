@@ -100,7 +100,10 @@ function MapInner({
     if (s) map.panTo({ lat: s.lat, lng: s.lng });
   }, [map, selectedId, spots]);
 
-  // 半径(circle)に応じて副作用として地図に表示する
+  // 半径検索の円を描画する。
+  // circle の参照は地図が動くたびに変わるため、この effect は頻繁に再実行される。
+  // よって cleanup で円を破棄してはいけない（毎回 再生成されてチラつく）。
+  // Circle インスタンスは使い回し、消すのは circle が null になったときだけ。
   useEffect(() => {
     if (!map) return;
     if (!circle) {
@@ -121,8 +124,16 @@ function MapInner({
     }
     circleRef.current.setCenter(circle.center);
     circleRef.current.setRadius(circle.radiusKm * 1000);
-    return () => {};
   }, [map, circle]);
+
+  // 円の後始末はアンマウント時のみ。依存配列が空なので、上の effect の
+  // 再実行では走らず、チラつきを起こさずに地図から取り除ける。
+  useEffect(() => {
+    return () => {
+      circleRef.current?.setMap(null);
+      circleRef.current = null;
+    };
+  }, []);
 
   const selectedSpot = spots.find((s) => s.id === selectedId) ?? null;
   const selectedIcon: google.maps.Symbol | undefined =
