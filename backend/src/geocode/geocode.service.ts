@@ -1,3 +1,4 @@
+// 逆ジオコーディングして、住所を取得する処理本体(サービス層)
 import { Injectable, Logger } from '@nestjs/common';
 
 interface CacheEntry {
@@ -11,9 +12,7 @@ export interface ReverseGeocodeResult {
 }
 
 /**
- * Quantise coordinates into a grid cell key so that tiny map movements resolve
- * to the same cache entry (~110m at 3 decimals). This is the core of the
- * "don't hit the API on small moves" optimisation.
+小さな変更ではAPIを叩かないよう緯度と経度を受け取ってキーを生成する
  */
 export function quantizeKey(lat: number, lng: number, decimals = 3): string {
   return `${lat.toFixed(decimals)},${lng.toFixed(decimals)}`;
@@ -23,10 +22,11 @@ export function quantizeKey(lat: number, lng: number, decimals = 3): string {
 export class GeocodeService {
   private readonly logger = new Logger(GeocodeService.name);
   private readonly cache = new Map<string, CacheEntry>();
-  private readonly ttlMs = 1000 * 60 * 60 * 24; // 24h: addresses are effectively static
+  private readonly ttlMs = 1000 * 60 * 60 * 24; // 24時間キャッシュを有効にする
+  // フロントでキーを管理したくないが、即時的なレスポンスを返すために必要(プロキシでコントロールする)
   private readonly apiKey = process.env.GOOGLE_GEOCODING_API_KEY || '';
 
-  /** Reverse-geocode a coordinate, using a shared server-side cache. */
+  /** Promiseオブジェクトで緯度と経度を受け取ってキーを生成してキャッシュを管理する */
   async reverse(lat: number, lng: number): Promise<ReverseGeocodeResult> {
     const key = quantizeKey(lat, lng);
     const now = Date.now();
@@ -39,7 +39,7 @@ export class GeocodeService {
     return { address, cached: false };
   }
 
-  /** A real key is anything not empty and not the documented dummy placeholder. */
+  /** もしも、API keyがダミーのままの場合には、フォールバックする*/
   private isRealKey(): boolean {
     return !!this.apiKey && !this.apiKey.startsWith('dummy');
   }
@@ -49,13 +49,13 @@ export class GeocodeService {
   }
 
   private async fetchAddress(lat: number, lng: number): Promise<string> {
-    // Without a real key the app still works, returning a readable coordinate label.
+    // もし、keyがない場合にはフォールバックする
     if (!this.isRealKey()) {
       return this.fallback(lat, lng);
     }
     try {
       const url = new URL('https://maps.googleapis.com/maps/api/geocode/json');
-      url.searchParams.set('latlng', `${lat},${lng}`);
+      url.searchParams.set('latlng', `${lat},${lng}`); // 緯度と経度をキーにしてリクエスト
       url.searchParams.set('language', 'ja');
       url.searchParams.set('key', this.apiKey);
 

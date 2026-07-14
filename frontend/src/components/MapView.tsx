@@ -1,3 +1,4 @@
+// 地図表示コンポーネント
 'use client';
 
 import {
@@ -10,7 +11,7 @@ import {
 import { useEffect, useRef } from 'react';
 import type { Spot, LatLng, Bounds } from '@/lib/types';
 
-// Rough geographic centre of Japan, used before the initial fit runs.
+// 日本の地理的中心(緯度経度)
 const JAPAN_CENTER: LatLng = { lat: 37.5, lng: 137.0 };
 const JAPAN_ZOOM = 5;
 
@@ -19,15 +20,15 @@ interface MapViewProps {
   spots: Spot[];
   selectedId: number | null;
   onSelect: (id: number | null) => void;
-  /** Fit the viewport to these bounds once, on first load. */
+  /** 表示範囲を設定する */
   initialBounds?: Bounds;
-  /** Radius circle to draw (centre + radius in km), or null. */
+  /** 半径(circle)に応じて副作用として地図に表示する */
   circle?: { center: LatLng; radiusKm: number } | null;
-  /** Called (on map idle) with the current centre and viewport bounds. */
+  /** マップ操作が終了した時に中心位置と表示範囲を取得する */
   onCameraChange?: (center: LatLng, bounds: Bounds | null) => void;
 }
 
-/** Runs inside the Map context so it can access the google.maps.Map instance. */
+/** Mapコンテキスト内で実行されるため、google.maps.Mapインスタンスにアクセスできる */
 function MapInner({
   spots,
   selectedId,
@@ -40,7 +41,7 @@ function MapInner({
   const didFit = useRef(false);
   const circleRef = useRef<google.maps.Circle | null>(null);
 
-  // Clicking empty map area recenters and clears any selection.
+  // 空の地図領域をクリックした時に地図を中心に移動して選択を解除する
   useEffect(() => {
     if (!map) return;
     const listener = map.addListener(
@@ -53,7 +54,7 @@ function MapInner({
     return () => listener.remove();
   }, [map, onSelect]);
 
-  // Fit to the initial (nationwide) bounds once.
+  // 
   useEffect(() => {
     if (!map || !initialBounds || didFit.current) return;
     map.fitBounds(
@@ -68,7 +69,7 @@ function MapInner({
     didFit.current = true;
   }, [map, initialBounds]);
 
-  // Emit centre + bounds whenever the camera settles.
+  // マップ操作が終了した時に中心位置と表示範囲を取得する
   useEffect(() => {
     if (!map || !onCameraChange) return;
     const emit = () => {
@@ -92,14 +93,14 @@ function MapInner({
     return () => listener.remove();
   }, [map, onCameraChange]);
 
-  // Pan to a spot when it becomes selected (e.g. clicked in the list).
+  // スポットが選択された時に地図をそのスポットの位置に移動する
   useEffect(() => {
     if (!map || selectedId == null) return;
     const s = spots.find((x) => x.id === selectedId);
     if (s) map.panTo({ lat: s.lat, lng: s.lng });
   }, [map, selectedId, spots]);
 
-  // Draw/update the radius circle imperatively.
+  // 半径(circle)に応じて副作用として地図に表示する
   useEffect(() => {
     if (!map) return;
     if (!circle) {
@@ -120,9 +121,7 @@ function MapInner({
     }
     circleRef.current.setCenter(circle.center);
     circleRef.current.setRadius(circle.radiusKm * 1000);
-    return () => {
-      // cleanup on unmount handled by the null branch above
-    };
+    return () => {};
   }, [map, circle]);
 
   const selectedSpot = spots.find((s) => s.id === selectedId) ?? null;
@@ -171,7 +170,7 @@ function MapInner({
   );
 }
 
-/** Fixed pin at the map centre — always marks the search origin. */
+/** 画面中央に固定のピン表示 */
 function CenterMarker() {
   return (
     <div className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2">

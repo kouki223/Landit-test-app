@@ -2,7 +2,7 @@ import type { Metadata } from 'next';
 import './globals.css';
 
 export const metadata: Metadata = {
-  title: 'Landit スポット探索',
+  title: 'スポット探索アプリケーション',
   description: '地図上でスポットを周辺検索できる位置情報探索アプリ',
 };
 

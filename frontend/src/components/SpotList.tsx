@@ -28,7 +28,7 @@ export default function SpotList({
 }: SpotListProps) {
   const selectedRef = useRef<HTMLLIElement | null>(null);
 
-  // Keep the highlighted row visible when selection is driven from the map.
+  // 選択されたスポットが表示されている時にスクロールする
   useEffect(() => {
     selectedRef.current?.scrollIntoView({ block: 'nearest' });
   }, [selectedId]);

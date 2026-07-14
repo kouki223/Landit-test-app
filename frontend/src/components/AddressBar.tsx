@@ -1,3 +1,4 @@
+// 住所バー(住所を表示するコンポーネント)
 'use client';
 
 interface AddressBarProps {

@@ -5,18 +5,17 @@ import Spinner from './Spinner';
 const PRESETS = [1, 3, 5, 10];
 
 interface RadiusControlProps {
-  /** Whether radius search (and its circle) is enabled. */
   enabled: boolean;
   onToggle: (on: boolean) => void;
   radiusKm: number;
   onRadiusChange: (km: number) => void;
   onSearch: () => void;
   onClear: () => void;
-  /** True while a radius search result is being shown. */
+  /** 半径検索結果が表示されている時にtrue */
   active: boolean;
-  /** Disable actions until the map centre is known. */
+  /** 地図の中心位置が不明な時にtrue */
   disabled?: boolean;
-  /** True while a radius search request is in flight. */
+  /** 半径検索リクエストが実行中の時にtrue */
   searching?: boolean;
 }
 
