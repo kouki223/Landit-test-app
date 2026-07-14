@@ -21,7 +21,7 @@ import type { Spot, LatLng, Bounds } from '@/lib/types';
 
 const API_KEY = process.env.NEXT_PUBLIC_GOOGLE_MAPS_API_KEY ?? '';
 
-// Padded bounding box covering the whole spot dataset (all of Japan).
+// 初期表示を日本全域に設定する
 const JAPAN_BOUNDS: Bounds = { minLat: 24, minLng: 122, maxLat: 46, maxLng: 146 };
 
 interface RadiusResult {
@@ -30,26 +30,34 @@ interface RadiusResult {
 }
 
 export default function MapExplorer() {
-  const [spots, setSpots] = useState<Spot[]>([]);
-  const [selectedId, setSelectedId] = useState<number | null>(null);
+  // 地図の現在位置
   const [center, setCenter] = useState<LatLng | null>(null);
   const [bounds, setBounds] = useState<Bounds | null>(null);
+
+  // 表示するデータを管理する
+  const [spots, setSpots] = useState<Spot[]>([]);
+  const [selectedId, setSelectedId] = useState<number | null>(null);
+  const [address, setAddress] = useState<string | null>(null);
+  
+  // 半径検索モードの設定
   const [radiusKm, setRadiusKm] = useState(5);
   const [radiusResult, setRadiusResult] = useState<RadiusResult | null>(null);
   const [radiusMode, setRadiusMode] = useState(false);
-  const [address, setAddress] = useState<string | null>(null);
+  
+  // ローディング関連の状態管理
   const [addressLoading, setAddressLoading] = useState(false);
   const [spotsLoading, setSpotsLoading] = useState(false);
   const [searching, setSearching] = useState(false);
 
-  // Mirror radiusResult in a ref so the debounced camera handler can read it.
+  // radiusResultをrefにコピーして、debounced camera handlerで読み込めるようにする
   const radiusActiveRef = useRef(false);
   useEffect(() => {
     radiusActiveRef.current = radiusResult !== null;
   }, [radiusResult]);
 
-  // Last fully-fetched region. A new viewport contained within it can be served
-  // by filtering locally instead of calling the API again.
+// 直近に「完全取得」した領域。新しい表示範囲がこの中に収まるなら、
+// API を再取得せずローカルの filter だけで一覧を作れる。
+// 描画に使う値ではない（更新で再レンダリングは不要）ので useState ではなく useRef。
   const cacheRef = useRef<CachedRegion | null>(null);
 
   const fetchAndCache = useCallback((b: Bounds) => {
@@ -65,7 +73,7 @@ export default function MapExplorer() {
 
   const loadBounds = useRef(debounce(fetchAndCache, 400));
 
-  // Serve from the cached region when zooming into it; otherwise fetch (debounced).
+  // 表示範囲を更新する
   const applyViewport = useCallback(
     (b: Bounds) => {
       const cache = cacheRef.current;
@@ -78,7 +86,7 @@ export default function MapExplorer() {
     [],
   );
 
-  // Reverse-geocode resolver with distance-threshold + grid cache (fewer API calls).
+  // 逆ジオコーディングを行って住所を取得する
   const resolveAddress = useRef(
     createAddressResolver({
       fetchAddress: (c) => reverseGeocode(c).then((r) => r.address),
@@ -88,10 +96,9 @@ export default function MapExplorer() {
   const handleCameraChange = useCallback((c: LatLng, b: Bounds | null) => {
     setCenter(c);
     setBounds(b);
-    // In radius mode the list is frozen to the search result; skip viewport fetch.
+    // 半径検索モードでは、リストは検索結果に固定されているので、表示範囲の更新はスキップする
     if (!radiusActiveRef.current && b) applyViewport(b);
-
-    // Update the centre address (skipped internally for tiny moves / cache hits).
+    // 中心の住所を更新する
     setAddressLoading(true);
     resolveAddress
       .current(c)
@@ -113,8 +120,9 @@ export default function MapExplorer() {
       .finally(() => setSearching(false));
   }, [center, radiusKm]);
 
-  const handleClear = useCallback(() => {
+  const resetToViewport = useCallback(() => {
     setRadiusResult(null);
+    // 選択されたスポットをクリアする
     setSelectedId(null);
     if (bounds) fetchAndCache(bounds);
   }, [bounds, fetchAndCache]);
@@ -122,14 +130,9 @@ export default function MapExplorer() {
   const handleToggleRadius = useCallback(
     (on: boolean) => {
       setRadiusMode(on);
-      // Turning off clears any active result and returns to the viewport list.
-      if (!on) {
-        setRadiusResult(null);
-        setSelectedId(null);
-        if (bounds) fetchAndCache(bounds);
-      }
+      if (!on) resetToViewport();
     },
-    [bounds, fetchAndCache],
+    [resetToViewport],
   );
 
   if (!API_KEY) {
@@ -146,8 +149,7 @@ export default function MapExplorer() {
     );
   }
 
-  // Only draw a circle when radius search is enabled: frozen at the searched
-  // centre while a result is shown, otherwise a live preview at the map centre.
+  // 半径検索モードの場合には、radiusResultを使用する
   const circle = radiusMode
     ? (radiusResult ?? (center ? { center, radiusKm } : null))
     : null;
@@ -176,7 +178,7 @@ export default function MapExplorer() {
             radiusKm={radiusKm}
             onRadiusChange={setRadiusKm}
             onSearch={handleSearch}
-            onClear={handleClear}
+            onClear={resetToViewport}
             active={radiusResult !== null}
             disabled={center === null}
             searching={searching}
